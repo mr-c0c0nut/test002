@@ -1,90 +1,61 @@
+from datetime import datetime
 import os
-
 from flask import Flask, render_template, request
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-
+import requests
 
 app = Flask(__name__)
 
-# Giới hạn kích thước request
-app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024  # 1 MB
-
-# Cookie security
-app.config.update(
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SECURE=True,
-    SESSION_COOKIE_SAMESITE="Lax",
-)
-
-# Rate limiting
-#
-# memory:// phù hợp cho instance đơn.
-# Nếu chạy nhiều instance, hãy dùng Redis và đặt:
-# RATELIMIT_STORAGE_URI=redis://...
-limiter = Limiter(
-    key_func=get_remote_address,
-    app=app,
-    default_limits=[
-        "200 per minute",
-        "1000 per hour",
-    ],
-    storage_uri=os.environ.get(
-        "RATELIMIT_STORAGE_URI",
-        "memory://",
-    ),
-)
+# Discord Webhook URL của bạn
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1548284221213245481/5_62xA-rvF8mIpnr__dwKChr6M-uz59LovQVl-xV1JzJlPJKVfo1MqBmncj7oGnYjvru"
 
 
-@app.after_request
-def add_security_headers(response):
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = (
-        "strict-origin-when-cross-origin"
-    )
+def send_discord_alert(ip, user_agent, path):
+  try:
+    # Lấy thời gian hiện tại
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Chỉ bật HSTS khi request thực sự chạy qua HTTPS.
-    if request.is_secure:
-        response.headers["Strict-Transport-Security"] = (
-            "max-age=31536000; includeSubDomains"
-        )
+    # Tạo nội dung tin nhắn đẹp mắt trên Discord (dùng Embed hoặc text thường)
+    payload = {
+        "content": "🚨 **[CẢNH BÁO] Có người truy cập vào hệ thống!**",
+        "embeds": [{
+            "title": "Thông tin chi tiết lượt truy cập",
+            "color": 16711680,  # Màu đỏ cảnh báo
+            "fields": [
+                {"name": "🌐 Địa chỉ IP", "value": f"`{ip}`", "inline": True},
+                {"name": "📂 Đường dẫn", "value": f"`{path}`", "inline": True},
+                {"name": "⏰ Thời gian", "value": f"`{now}`", "inline": False},
+                {
+                    "name": "💻 Thiết bị / Trình duyệt",
+                    "value": f"```{user_agent}```",
+                    "inline": False,
+                },
+            ],
+        }],
+    }
 
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "img-src 'self' data:; "
-        "style-src 'self' 'unsafe-inline'; "
-        "script-src 'self'; "
-        "object-src 'none'; "
-        "base-uri 'self'; "
-        "frame-ancestors 'none';"
-    )
-
-    return response
+    # Gửi request tới Discord
+    requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=5)
+  except Exception as e:
+    print(f"Lỗi khi gửi webhook Discord: {e}")
 
 
-@app.route("/", methods=["GET"])
-@limiter.limit("30 per minute")
+@app.route("/")
 def home():
-    return render_template("index.html")
+  # Lấy IP thực của người truy cập (xử lý trường hợp chạy sau Proxy/Cloudflare/Render)
+  if request.headers.get("X-Forwarded-For"):
+    ip = request.headers.get("X-Forwarded-For").split(",")[0].strip()
+  else:
+    ip = request.remote_addr
+
+  user_agent = request.headers.get("User-Agent")
+  path = request.path
+
+  # Gửi thông báo ngầm sang Discord (không làm chậm tốc độ tải trang của người dùng)
+  send_discord_alert(ip, user_agent, path)
+
+  return render_template("index.html")
 
 
-@app.errorhandler(413)
-def request_too_large(error):
-    return "Request too large", 413
-
-
-@app.errorhandler(429)
-def rate_limited(error):
-    return "Too many requests. Please try again later.", 429
-
-
-@app.errorhandler(500)
-def internal_error(error):
-    return "Internal server error", 500
-
-
-# Không cần app.run() trên Render.
-# Render sẽ chạy:
-# gunicorn app:app
-
+if __name__ == "__main__":
+  port = int(os.environ.get("PORT", 5000))
+  app.run(host="0.0.0.0", port=port)
