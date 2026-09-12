@@ -11,8 +11,6 @@ DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1548284221213245481/5_62
 def send_discord_alert(ip, user_agent, path):
   try:
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # Dùng text thuần để loại bỏ hoàn toàn lỗi định dạng Embed của Discord
     message = (
         f"🚨 **CÓ NGƯỜI TRUY CẬP WEB!**\n"
         f"🌐 **IP:** `{ip}`\n"
@@ -20,27 +18,29 @@ def send_discord_alert(ip, user_agent, path):
         f"⏰ **Thời gian:** `{now}`\n"
         f"💻 **Thiết bị:** ```{user_agent}```"
     )
-
     payload = {"content": message}
-
     response = requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=5)
-    print(
-        f"Trạng thái gửi Discord: {response.status_code}"
-    )  # In ra log trên Render
+    print(f"Trạng thái gửi Discord: {response.status_code}")
   except Exception as e:
     print(f"Lỗi ngoại lệ khi gửi webhook: {e}")
 
 
 @app.route("/")
 def home():
+  user_agent = request.headers.get("User-Agent", "")
+
+  # BỎ QUA nếu request đến từ bot health check của Render (tránh lỗi 429)
+  if "Go-http-client" in user_agent:
+    return render_template("index.html")
+
   if request.headers.get("X-Forwarded-For"):
     ip = request.headers.get("X-Forwarded-For").split(",")[0].strip()
   else:
     ip = request.remote_addr
 
-  user_agent = request.headers.get("User-Agent", "Unknown")
   path = request.path
 
+  # Gửi thông báo khi có người dùng thật truy cập
   send_discord_alert(ip, user_agent, path)
 
   return render_template("index.html")
