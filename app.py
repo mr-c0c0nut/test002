@@ -5,7 +5,6 @@ import requests
 
 app = Flask(__name__)
 
-# [HÃY THAY LINK WEBHOOK MỚI TINH TẠI ĐÂY NẾU WEBHOOK CŨ VẪN LỖI]
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1548284221213245481/5_62xA-rvF8mIpnr__dwKChr6M-uz59LovQVl-xV1JzJlPJKVfo1MqBmncj7oGnYjvru"
 
 
@@ -21,11 +20,7 @@ def send_discord_alert(ip, user_agent, path):
     )
     payload = {"content": message}
     response = requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=5)
-
-    if response.status_code == 429:
-      print("Discord đang chặn (429): Quá nhiều yêu cầu gửi tới webhook này.")
-    else:
-      print(f"Trạng thái gửi Discord: {response.status_code}")
+    print(f"Trạng thái gửi Discord: {response.status_code}")
   except Exception as e:
     print(f"Lỗi ngoại lệ khi gửi webhook: {e}")
 
@@ -34,12 +29,8 @@ def send_discord_alert(ip, user_agent, path):
 def home():
   user_agent = request.headers.get("User-Agent", "")
 
-  # Lọc toàn bộ các request từ bot, health check hoặc tool tự động
-  if (
-      "Go-http-client" in user_agent
-      or "Internal" in user_agent
-      or "Render" in user_agent
-  ):
+  # Bỏ qua các bot kiểm tra tự động
+  if "Go-http-client" in user_agent or "Render" in user_agent:
     return render_template("index.html")
 
   if request.headers.get("X-Forwarded-For"):
@@ -49,10 +40,16 @@ def home():
 
   path = request.path
 
-  # Gửi thông báo khi có người dùng thật truy cập
+  # Gửi thông báo
   send_discord_alert(ip, user_agent, path)
 
   return render_template("index.html")
+
+
+# Chặn yêu cầu favicon để tránh trigger thừa
+@app.route("/favicon.ico")
+def favicon():
+  return "", 204
 
 
 if __name__ == "__main__":
