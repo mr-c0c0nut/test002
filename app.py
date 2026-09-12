@@ -5,21 +5,17 @@ import requests
 
 app = Flask(__name__)
 
-# Discord Webhook URL của bạn
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1548284221213245481/5_62xA-rvF8mIpnr__dwKChr6M-uz59LovQVl-xV1JzJlPJKVfo1MqBmncj7oGnYjvru"
 
 
 def send_discord_alert(ip, user_agent, path):
   try:
-    # Lấy thời gian hiện tại
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # Tạo nội dung tin nhắn đẹp mắt trên Discord (dùng Embed hoặc text thường)
     payload = {
-        "content": "🚨 **[CẢNH BÁO] Có người truy cập vào hệ thống!**",
+        "content": "🚨 **[CẢNH BÁO] Có người truy cập hệ thống!**",
         "embeds": [{
-            "title": "Thông tin chi tiết lượt truy cập",
-            "color": 16711680,  # Màu đỏ cảnh báo
+            "title": "Chi tiết lượt truy cập",
+            "color": 16711680,
             "fields": [
                 {"name": "🌐 Địa chỉ IP", "value": f"`{ip}`", "inline": True},
                 {"name": "📂 Đường dẫn", "value": f"`{path}`", "inline": True},
@@ -33,24 +29,26 @@ def send_discord_alert(ip, user_agent, path):
         }],
     }
 
-    # Gửi request tới Discord
-    requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=5)
+    # Thêm timeout=3 để tránh bị treo app nếu Discord phản hồi chậm
+    response = requests.post(
+        DISCORD_WEBHOOK_URL, json=payload, timeout=3
+    )
+    print(f"Discord Response Status: {response.status_code}")  # In ra log Render
   except Exception as e:
-    print(f"Lỗi khi gửi webhook Discord: {e}")
+    print(f"LỖI GỬI WEBHOOK: {e}")  # In lỗi chi tiết ra log Render
 
 
 @app.route("/")
 def home():
-  # Lấy IP thực của người truy cập (xử lý trường hợp chạy sau Proxy/Cloudflare/Render)
   if request.headers.get("X-Forwarded-For"):
     ip = request.headers.get("X-Forwarded-For").split(",")[0].strip()
   else:
     ip = request.remote_addr
 
-  user_agent = request.headers.get("User-Agent")
+  user_agent = request.headers.get("User-Agent", "Unknown")
   path = request.path
 
-  # Gửi thông báo ngầm sang Discord (không làm chậm tốc độ tải trang của người dùng)
+  # Kích hoạt gửi thông báo
   send_discord_alert(ip, user_agent, path)
 
   return render_template("index.html")
