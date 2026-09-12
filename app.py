@@ -11,31 +11,24 @@ DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1548284221213245481/5_62
 def send_discord_alert(ip, user_agent, path):
   try:
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    payload = {
-        "content": "🚨 **[CẢNH BÁO] Có người truy cập hệ thống!**",
-        "embeds": [{
-            "title": "Chi tiết lượt truy cập",
-            "color": 16711680,
-            "fields": [
-                {"name": "🌐 Địa chỉ IP", "value": f"`{ip}`", "inline": True},
-                {"name": "📂 Đường dẫn", "value": f"`{path}`", "inline": True},
-                {"name": "⏰ Thời gian", "value": f"`{now}`", "inline": False},
-                {
-                    "name": "💻 Thiết bị / Trình duyệt",
-                    "value": f"```{user_agent}```",
-                    "inline": False,
-                },
-            ],
-        }],
-    }
 
-    # Thêm timeout=3 để tránh bị treo app nếu Discord phản hồi chậm
-    response = requests.post(
-        DISCORD_WEBHOOK_URL, json=payload, timeout=3
+    # Dùng text thuần để loại bỏ hoàn toàn lỗi định dạng Embed của Discord
+    message = (
+        f"🚨 **CÓ NGƯỜI TRUY CẬP WEB!**\n"
+        f"🌐 **IP:** `{ip}`\n"
+        f"📂 **Đường dẫn:** `{path}`\n"
+        f"⏰ **Thời gian:** `{now}`\n"
+        f"💻 **Thiết bị:** ```{user_agent}```"
     )
-    print(f"Discord Response Status: {response.status_code}")  # In ra log Render
+
+    payload = {"content": message}
+
+    response = requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=5)
+    print(
+        f"Trạng thái gửi Discord: {response.status_code}"
+    )  # In ra log trên Render
   except Exception as e:
-    print(f"LỖI GỬI WEBHOOK: {e}")  # In lỗi chi tiết ra log Render
+    print(f"Lỗi ngoại lệ khi gửi webhook: {e}")
 
 
 @app.route("/")
@@ -48,7 +41,6 @@ def home():
   user_agent = request.headers.get("User-Agent", "Unknown")
   path = request.path
 
-  # Kích hoạt gửi thông báo
   send_discord_alert(ip, user_agent, path)
 
   return render_template("index.html")
