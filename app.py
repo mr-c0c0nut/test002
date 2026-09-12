@@ -5,7 +5,7 @@ import requests
 
 app = Flask(__name__)
 
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1548284221213245481/5_62xA-rvF8mIpnr__dwKChr6M-uz59LovQVl-xV1JzJlPJKVfo1MqBmncj7oGnYjvru"
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1548293385914294322/OJ9eei9CnfDk35I47Of1Zbc3LQxTu8hqNVTQMZw7xQZgR3taRECv0z5M-H4X4QNk1TNv"
 
 
 def send_discord_alert(ip, user_agent, path):
